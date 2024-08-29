@@ -1,92 +1,61 @@
 package com.todo.todoapp.controller;
 
+import com.todo.todoapp.model.Todo;
+import com.todo.todoapp.repository.TodoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Optional;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
+@RequestMapping("/api/todos")
 public class TodoController {
 
-    private List<Todo> todos = new ArrayList<Todo>();
-    private AtomicInteger idCounter = new AtomicInteger();
+    @Autowired
+    private TodoRepository todoRepository;
 
-    @GetMapping("/api/todos")
+    @GetMapping
     public List<Todo> getTodos() {
-        return todos;
+        return todoRepository.findAll();
     }
-    @GetMapping("/api/todos/{id}")
-    public ResponseEntity<Todo> getTodoById(@PathVariable int id) {
-        return todos.stream()
-                .filter(t -> t.getId() == id)
-                .findFirst()
-                .map(ResponseEntity::ok)
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Todo> getTodoById(@PathVariable String id) {
+        Optional<Todo> todo = todoRepository.findById(id);
+        return todo.map(ResponseEntity::ok)
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    @PostMapping("/api/todos")
-    public ResponseEntity<Todo> createTodo(@RequestParam String title,
-                                           @RequestParam String description,
-                                           @RequestParam(defaultValue = "false") boolean completed) {
-
-        int id = idCounter.incrementAndGet();
-        Todo newTodo = new Todo(id, title, description, completed);
-
-        todos.add(newTodo);
-
-        return new ResponseEntity<>(newTodo, HttpStatus.CREATED);
+    @PostMapping
+    public ResponseEntity<Todo> createTodo(@RequestBody Todo newTodo) {
+        Todo savedTodo = todoRepository.save(newTodo);
+        return new ResponseEntity<>(savedTodo, HttpStatus.CREATED);
     }
 
-
-
-}
-
-
-class Todo {
-    private int id;
-    private String title;
-    private String description;
-    private boolean completed;
-
-    public Todo(int id, String title, String description, boolean completed) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
-        this.completed = completed;
+    @PutMapping("/{id}")
+    public ResponseEntity<Todo> updateTodo(@PathVariable String id, @RequestBody Todo updatedTodo) {
+        return todoRepository.findById(id)
+                .map(todo -> {
+                    todo.setTitle(updatedTodo.getTitle());
+                    todo.setDescription(updatedTodo.getDescription());
+                    todo.setCompleted(updatedTodo.isCompleted());
+                    todoRepository.save(todo);
+                    return new ResponseEntity<>(todo, HttpStatus.OK);
+                })
+                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public boolean isCompleted() {
-        return completed;
-    }
-
-    public void setCompleted(boolean completed) {
-        this.completed = completed;
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTodo(@PathVariable String id) {
+        if (todoRepository.existsById(id)) {
+            todoRepository.deleteById(id);
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 }
